@@ -14,6 +14,7 @@
 
 <div id="app">
   <canvas id="bg-canvas"></canvas>
+  <canvas id="planet-canvas"></canvas>
   <div class="scanlines"></div>
   <div class="content">
     <div class="main-grid">
@@ -108,6 +109,11 @@
           <span>VOL</span>
           <input type="range" id="vol" min="0" max="100" value="80" step="1">
           <span id="vol-out">80%</span>
+        </div>
+
+        <div class="eq-section">
+          <div class="panel-label">// equalizer</div>
+          <div class="eq-bands" id="eq-bands"></div>
         </div>
       </div>
 

@@ -28,6 +28,10 @@ let tracks = [], cur = -1, shuffle = false, loop = false
 let rotAngle = 0, rotFrame = null
 let vizBars = [], audioCtx = null, analyser = null, source = null
 
+const EQ_FREQS  = [60, 170, 310, 600, 1000, 3000, 6000, 12000]
+const EQ_LABELS = ['60', '170', '310', '600', '1k', '3k', '6k', '12k']
+let eqFilters = [], eqGains = new Array(8).fill(0)
+
 for (let i = 0; i < 28; i++) {
   const d = document.createElement('div')
   d.className = 'vdot'
@@ -49,7 +53,17 @@ function setupAudio() {
   analyser = audioCtx.createAnalyser()
   analyser.fftSize = 64
   source = audioCtx.createMediaElementSource(audio)
-  source.connect(analyser)
+  eqFilters = EQ_FREQS.map((freq, i) => {
+    const f = audioCtx.createBiquadFilter()
+    f.type = i === 0 ? 'lowshelf' : i === EQ_FREQS.length - 1 ? 'highshelf' : 'peaking'
+    f.frequency.value = freq
+    f.Q.value = 1.2
+    f.gain.value = eqGains[i]
+    return f
+  })
+  source.connect(eqFilters[0])
+  for (let i = 0; i < eqFilters.length - 1; i++) eqFilters[i].connect(eqFilters[i + 1])
+  eqFilters[eqFilters.length - 1].connect(analyser)
   analyser.connect(audioCtx.destination)
 }
 
@@ -388,6 +402,157 @@ loadPrefs()
   }
 
   requestAnimationFrame(frame)
+})()
+
+// ─── EQUALIZER UI ────────────────────────────────────────────────────────────
+;(function() {
+  const container = document.getElementById('eq-bands')
+  EQ_LABELS.forEach((label, i) => {
+    const col = document.createElement('div')
+    col.className = 'eq-col'
+    col.innerHTML =
+      `<span class="eq-db" id="eqdb${i}">0</span>` +
+      `<div class="eq-sw"><input type="range" class="eq-slider" id="eqs${i}" min="-12" max="12" value="0" step="0.5"></div>` +
+      `<span class="eq-freq">${label}</span>`
+    container.appendChild(col)
+    col.querySelector('input').addEventListener('input', e => {
+      const v = parseFloat(e.target.value)
+      eqGains[i] = v
+      if (eqFilters[i]) eqFilters[i].gain.value = v
+      const dbEl = document.getElementById('eqdb' + i)
+      dbEl.textContent = (v > 0 ? '+' : '') + v
+      dbEl.style.color = v > 0 ? 'var(--cyan)' : v < 0 ? 'var(--magenta)' : ''
+    })
+  })
+})()
+
+// ─── PLANET CANVAS ───────────────────────────────────────────────────────────
+;(function() {
+  const pc = document.getElementById('planet-canvas')
+  const ctx = pc.getContext('2d')
+
+  function resize() { pc.width = pc.offsetWidth; pc.height = pc.offsetHeight }
+  resize()
+  window.addEventListener('resize', resize)
+
+  const PLANETS = [
+    { x:0.10, y:0.20, r:44, rot:0,   rotSpd:0.003,  vx:0.000055, vy:0.000040,
+      c1:'#0d001f', c2:'#290060', acc:'#9900ff', rings:true,  ringCol:'rgba(120,0,220,0.5)' },
+    { x:0.82, y:0.14, r:26, rot:1.0, rotSpd:-0.005, vx:-0.000045, vy:0.000065,
+      c1:'#001520', c2:'#003348', acc:'#00ffe7', rings:false, ringCol:null },
+    { x:0.90, y:0.62, r:20, rot:0.8, rotSpd:0.009,  vx:-0.000080, vy:-0.000050,
+      c1:'#200010', c2:'#480020', acc:'#ff00c8', rings:false, ringCol:null },
+    { x:0.16, y:0.78, r:32, rot:2.0, rotSpd:-0.004, vx:0.000060, vy:-0.000030,
+      c1:'#141000', c2:'#2c2200', acc:'#ffe600', rings:true,  ringCol:'rgba(180,150,0,0.45)' },
+  ]
+
+  let dragging = null, lastMX = 0, velX = 0
+
+  function hitTest(mx, my) {
+    for (let i = PLANETS.length - 1; i >= 0; i--) {
+      const p = PLANETS[i]
+      const dx = mx - p.x * pc.width, dy = my - p.y * pc.height
+      if (dx*dx + dy*dy <= (p.r * 1.3) ** 2) return p
+    }
+    return null
+  }
+
+  // Use document-level events so drags never get "stuck"
+  document.addEventListener('mousemove', e => {
+    const rect = pc.getBoundingClientRect()
+    const mx = e.clientX - rect.left, my = e.clientY - rect.top
+    if (dragging) {
+      velX = mx - lastMX
+      dragging.x = Math.max(0.04, Math.min(0.96, mx / pc.width))
+      dragging.y = Math.max(0.04, Math.min(0.96, my / pc.height))
+      dragging.rotSpd = velX * 0.009
+      lastMX = mx
+    } else {
+      const over = hitTest(mx, my)
+      pc.style.pointerEvents = over ? 'auto' : 'none'
+      pc.style.cursor = over ? 'grab' : 'default'
+    }
+  })
+
+  pc.addEventListener('mousedown', e => {
+    const rect = pc.getBoundingClientRect()
+    const p = hitTest(e.clientX - rect.left, e.clientY - rect.top)
+    if (p) { dragging = p; lastMX = e.clientX - rect.left; velX = 0; pc.style.cursor = 'grabbing'; e.preventDefault() }
+  })
+
+  document.addEventListener('mouseup', () => {
+    if (dragging) { dragging.rotSpd = velX * 0.013; dragging = null; pc.style.pointerEvents = 'none' }
+  })
+
+  function drawPlanet(p) {
+    const W = pc.width, H = pc.height
+    const px = p.x * W, py = p.y * H, r = p.r
+
+    if (p !== dragging) {
+      p.x += p.vx; p.y += p.vy
+      if (p.x < -0.12) p.x = 1.12
+      if (p.x >  1.12) p.x = -0.12
+      if (p.y < -0.12) p.y = 1.12
+      if (p.y >  1.12) p.y = -0.12
+      if (Math.abs(p.rotSpd) > 0.0008) p.rotSpd *= 0.994
+    }
+    p.rot = (p.rot + p.rotSpd) % (Math.PI * 2)
+
+    // Ring — back half
+    if (p.rings) {
+      ctx.save(); ctx.translate(px, py); ctx.scale(1, 0.28)
+      ctx.beginPath(); ctx.arc(0, 0, r * 1.75, Math.PI, Math.PI * 2)
+      ctx.strokeStyle = p.ringCol; ctx.lineWidth = r * 0.28; ctx.globalAlpha = 0.5; ctx.stroke()
+      ctx.restore(); ctx.globalAlpha = 1
+    }
+
+    // Sphere
+    const grd = ctx.createRadialGradient(px - r*0.3, py - r*0.35, r*0.08, px, py, r)
+    grd.addColorStop(0, p.c2); grd.addColorStop(0.6, p.c2); grd.addColorStop(1, p.c1)
+    ctx.beginPath(); ctx.arc(px, py, r, 0, Math.PI*2)
+    ctx.fillStyle = grd; ctx.globalAlpha = 1; ctx.fill()
+
+    // Atmosphere rim
+    const atm = ctx.createRadialGradient(px, py, r*0.72, px, py, r*1.28)
+    atm.addColorStop(0, 'transparent')
+    atm.addColorStop(0.5, p.acc + '28')
+    atm.addColorStop(1, 'transparent')
+    ctx.beginPath(); ctx.arc(px, py, r*1.28, 0, Math.PI*2)
+    ctx.fillStyle = atm; ctx.globalAlpha = 0.7; ctx.fill(); ctx.globalAlpha = 1
+
+    // Surface bands (clipped)
+    ctx.save()
+    ctx.beginPath(); ctx.arc(px, py, r*0.97, 0, Math.PI*2); ctx.clip()
+    for (let b = 0; b < 5; b++) {
+      const by = py - r + (b/5)*r*2
+      const hw = Math.sqrt(Math.max(0, r*r - (by-py)**2))
+      const wave = Math.sin(p.rot*2 + b*1.4) * r*0.07
+      ctx.beginPath(); ctx.ellipse(px+wave, by, hw, r*0.13, 0, 0, Math.PI*2)
+      ctx.fillStyle = p.acc; ctx.globalAlpha = 0.06 + (b%2)*0.04; ctx.fill()
+    }
+    ctx.restore(); ctx.globalAlpha = 1
+
+    // Ring — front half
+    if (p.rings) {
+      ctx.save(); ctx.translate(px, py); ctx.scale(1, 0.28)
+      ctx.beginPath(); ctx.arc(0, 0, r*1.75, 0, Math.PI)
+      ctx.strokeStyle = p.ringCol; ctx.lineWidth = r*0.28; ctx.globalAlpha = 0.65; ctx.stroke()
+      ctx.restore(); ctx.globalAlpha = 1
+    }
+
+    // Specular highlight
+    const sg = ctx.createRadialGradient(px-r*0.27, py-r*0.3, 0, px-r*0.27, py-r*0.3, r*0.2)
+    sg.addColorStop(0, 'rgba(255,255,255,0.20)'); sg.addColorStop(1, 'transparent')
+    ctx.beginPath(); ctx.arc(px-r*0.27, py-r*0.3, r*0.2, 0, Math.PI*2)
+    ctx.fillStyle = sg; ctx.fill()
+  }
+
+  function frame() {
+    ctx.clearRect(0, 0, pc.width, pc.height)
+    PLANETS.forEach(drawPlanet)
+    requestAnimationFrame(frame)
+  }
+  frame()
 })()
 
 // ─── RECORD CANVAS FX ────────────────────────────────────────────────────────
