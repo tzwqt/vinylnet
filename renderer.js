@@ -407,6 +407,64 @@ loadPrefs()
 // ─── EQUALIZER UI ────────────────────────────────────────────────────────────
 ;(function() {
   const container = document.getElementById('eq-bands')
+
+  function resetEQ() {
+    EQ_FREQS.forEach((_, i) => {
+      eqGains[i] = 0
+      if (eqFilters[i]) eqFilters[i].gain.value = 0
+      const slider = document.getElementById('eqs' + i)
+      const dbEl = document.getElementById('eqdb' + i)
+      if (slider) slider.value = 0
+      if (dbEl) { dbEl.textContent = '0'; dbEl.style.color = '' }
+    })
+  }
+
+  // bands: [60, 170, 310, 600, 1k, 3k, 6k, 12k]
+  const EQ_PRESETS = [
+    { name: 'BASS',     gains: [8, 6, 4, 1, 0, -1, -1, -2] },
+    { name: 'ROCK',     gains: [5, 4, 2, -1, -1, 2, 4, 5] },
+    { name: 'POP',      gains: [-1, 2, 4, 5, 3, 1, -1, -1] },
+    { name: 'JAZZ',     gains: [3, 2, 1, 2, -1, -1, 1, 3] },
+    { name: 'HIP-HOP',  gains: [6, 5, 2, 3, -1, -1, 1, 2] },
+    { name: 'LOFI',     gains: [4, 3, 1, -2, -3, -2, 1, -4] },
+    { name: 'TREBLE',   gains: [-2, -2, -1, 0, 2, 4, 6, 8] },
+    { name: 'FLAT',     gains: [0, 0, 0, 0, 0, 0, 0, 0] },
+  ]
+
+  let activePreset = null
+
+  function applyPreset(preset) {
+    activePreset = preset
+    preset.gains.forEach((g, i) => {
+      eqGains[i] = g
+      if (eqFilters[i]) eqFilters[i].gain.value = g
+      const slider = document.getElementById('eqs' + i)
+      const dbEl = document.getElementById('eqdb' + i)
+      if (slider) slider.value = g
+      if (dbEl) {
+        dbEl.textContent = (g > 0 ? '+' : '') + g
+        dbEl.style.color = g > 0 ? 'var(--cyan)' : g < 0 ? 'var(--magenta)' : ''
+      }
+    })
+    document.querySelectorAll('.eq-preset').forEach(b => b.classList.toggle('active', b.dataset.preset === preset.name))
+  }
+
+  const presetsEl = document.getElementById('eq-presets')
+  EQ_PRESETS.forEach(preset => {
+    const btn = document.createElement('button')
+    btn.className = 'eq-preset'
+    btn.textContent = preset.name
+    btn.dataset.preset = preset.name
+    btn.addEventListener('click', () => applyPreset(preset))
+    presetsEl.appendChild(btn)
+  })
+
+  document.getElementById('eq-reset').addEventListener('click', () => {
+    activePreset = null
+    document.querySelectorAll('.eq-preset').forEach(b => b.classList.remove('active'))
+    resetEQ()
+  })
+
   EQ_LABELS.forEach((label, i) => {
     const col = document.createElement('div')
     col.className = 'eq-col'
