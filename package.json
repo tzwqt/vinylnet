@@ -1,7 +1,7 @@
 {
-  "name": "vinylnet",
+  "name": "Musik",
   "version": "2.0.0",
-  "description": "Y2K cyberpunk offline music player",
+  "description": "offline music player",
   "main": "main.js",
   "scripts": {
     "start": "electron .",
@@ -9,15 +9,15 @@
     "build-dmg": "electron-builder --mac dmg"
   },
   "build": {
-    "appId": "com.vinylnet.app",
-    "productName": "VinylNet",
+    "appId": "com.Musik.app",
+    "productName": "Musik",
     "mac": {
       "category": "public.app-category.music",
       "icon": "assets/icon.icns",
       "target": ["dmg", "zip"]
     },
     "dmg": {
-      "title": "VinylNet"
+      "title": "Musik"
     }
   },
   "devDependencies": {

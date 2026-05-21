@@ -167,8 +167,8 @@ searchEl.addEventListener('input', applySearch)
 searchClear.addEventListener('click', () => { searchEl.value = ''; applySearch(); searchEl.focus() })
 
 async function savePrefs() {
-  if (!window.vinylnet) return
-  await window.vinylnet.savePrefs({
+  if (!window.Musik) return
+  await window.Musik.savePrefs({
     folderPath: folderPath.textContent === 'no folder loaded' ? null : folderPath.textContent,
     currentIndex: cur,
     volume: audio.volume,
@@ -177,15 +177,15 @@ async function savePrefs() {
 }
 
 async function loadPrefs() {
-  if (!window.vinylnet) return
-  const prefs = await window.vinylnet.loadPrefs()
+  if (!window.Musik) return
+  const prefs = await window.Musik.loadPrefs()
   if (!prefs) return
   if (prefs.volume !== undefined) { audio.volume = prefs.volume; volSlider.value = Math.round(prefs.volume * 100); volOut.textContent = Math.round(prefs.volume * 100) + '%' }
   if (prefs.shuffle) { shuffle = true; btnShuf.classList.add('active') }
   if (prefs.loop) { loop = true; audio.loop = true; btnLoop.classList.add('active') }
   if (prefs.folderPath) {
     folderPath.textContent = prefs.folderPath
-    const scanned = await window.vinylnet.scanFolder(prefs.folderPath)
+    const scanned = await window.Musik.scanFolder(prefs.folderPath)
     if (scanned && scanned.length) {
       tracks = scanned
       renderQueue()
@@ -203,12 +203,12 @@ async function loadPrefs() {
 }
 
 btnFolder.addEventListener('click', async () => {
-  if (!window.vinylnet) return
-  const folder = await window.vinylnet.openFolder()
+  if (!window.Musik) return
+  const folder = await window.Musik.openFolder()
   if (!folder) return
   folderPath.textContent = folder
   stxt.textContent = 'SCANNING...'
-  const scanned = await window.vinylnet.scanFolder(folder)
+  const scanned = await window.Musik.scanFolder(folder)
   tracks = scanned || []
   cur = -1
   renderQueue()
