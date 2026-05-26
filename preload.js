@@ -1,6 +1,6 @@
 const { contextBridge, ipcRenderer } = require('electron')
 
-contextBridge.exposeInMainWorld('vinylnet', {
+contextBridge.exposeInMainWorld('Musik', {
   openFolder: () => ipcRenderer.invoke('open-folder'),
   scanFolder: (path) => ipcRenderer.invoke('scan-folder', path),
   savePrefs: (prefs) => ipcRenderer.invoke('save-prefs', prefs),
